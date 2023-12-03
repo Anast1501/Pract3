@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 )
-//Объявление глоба0льной переменной хэш-таблицы для хранения сокращённых и полных ссылок  (имеет тип данных хэш-таблицы)
-var urls = HashMap{}
+//Объявление глобальной переменной хэш-таблицы для хранения сокращённых и полных ссылок  (имеет тип данных хэш-таблицы)
+var urls = HashMap{} //HashMap представляет собой простую хэш-таблицу для хранения сокращённых и полных ссылок 
 
 
 
@@ -77,6 +77,7 @@ func handleForm(w http.ResponseWriter, r *http.Request) {
 }
 
 //Получение своего IP-адреса (для того чтобы вставить в короткую ссылку)  ip-адрес:порт/short/(короткий ключ)
+//ИЛИ  GetMyIp возвращает IP-адрес локального сервера (для использования в укороченных URL)
 func GetMyIP() net.IP {
 	conn,_:=net.Dial("udp", "8.8.8.8:80")
 	defer conn.Close() //закрытие соединения 
@@ -84,7 +85,6 @@ func GetMyIP() net.IP {
 	return localAddr.IP
 }
 
-// Add this function to your main.go file
 
 //handleUserInput обрабатывает ввод пользователя для укорочения ссылки URL и возвращает укороченный URL
 func handleUserInput(w http.ResponseWriter, r *http.Request) {
@@ -112,18 +112,16 @@ func handleUserInput(w http.ResponseWriter, r *http.Request) {
 	HostIP := GetMyIP()
 	shortenedURL := fmt.Sprintf("http://%s:%d/short/%s", HostIP, 3333, shortKey)
 
-	// Return the shortened URL to the user
-	//Возвращаем укороченный URL пользователю 
+	//Возвращаем укороченный (сокращённый) URL адрес пользователю 
 	fmt.Fprintf(w, "Ваша укороченная ссылка: %s", shortenedURL)
 }
 
-// Modify your main function to include this new handler
 
 func main() {
 	http.HandleFunc("/", handleForm)
 	http.HandleFunc("/shorten", handleShorten)
 	http.HandleFunc("/short/", handleRedirect)
-	http.HandleFunc("/user-input", handleUserInput) //Новый обработчик для ввода пользователя                               New handler for user input
+	http.HandleFunc("/user-input", handleUserInput) //Новый обработчик для ввода пользователя (для пользовательского ввода)                               
 
 	fmt.Println("URL Shortener is running on: 3333")
 	http.ListenAndServe("0.0.0.0:3333", nil)
