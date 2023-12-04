@@ -117,10 +117,12 @@ func handleUserInput(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Ваша укороченная ссылка: %s", shortenedURL)
 }
 
-
+//Выполнение TCP-запрос к серверу (к базе данных)
 func tcpRequest(request, key, value string) (string, error) {
+	//Установка TCP-соедиения с сервером (с базой данных)
 	conn, _:=net.Dial("tcp", "localhost:6379")
 	defer conn.Close()
+	//Отправка запроса к базе данных 
 	if request=="HPUSH"{
 		mainrequest:=fmt.Sprintf("%s %s %s", request, key, value)
 		 conn.Write([]byte(mainrequest))
@@ -129,7 +131,7 @@ func tcpRequest(request, key, value string) (string, error) {
 		mainrequest:=fmt.Sprintf("%s %s", request, key)
 		conn.Write([]byte(mainrequest))
 	}
-
+	//Чтение ответа от базы данных
 	tcpanswer:=make([]byte,512)
 	n,_:=conn.Read(tcpanswer)
 	return string(tcpanswer[:n]),nil
