@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 //Объявление глобальной переменной хэш-таблицы для хранения сокращённых и полных ссылок  (имеет тип данных хэш-таблицы)
-var urls = HashMap{} //HashMap представляет собой простую хэш-таблицу для хранения сокращённых и полных ссылок 
+//var urls = HashMap{} //HashMap представляет собой простую хэш-таблицу для хранения сокращённых и полных ссылок 
 
 
 
 // handleForm обрабатывает отправку ссылки, перенаправляет на "/shorten" при POST-запросе.
 func handleForm(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
-		http.Redirect(w, r, "/shorten", http.StatusSeeOther)
+		http.Redirect(w, r, "/shorten", http.StatusSeeOther) //перенаправление HTTP-запроса на новый URL
 		return 
 	}
 }
@@ -35,7 +35,7 @@ func handleForm(w http.ResponseWriter, r *http.Request) {
 
 		//Генерация короткого ключа и вставка пары (короткий ключ, оригинальный URL) в хэш-таблицу
 		shortKey:=generateShortKey()
-		err:=urls.Insert(shortKey, originalURL) //добавление хэш-таблицы
+		_,err:=tcpRequest("HPUSH", shortKey, originalURL)                          //urls.Insert(shortKey, originalURL) //добавление хэш-таблицы
 		if err!=nil {
 			http.Error(w, "Невозможно добавить укороченную ссылку в хэш-таблицу", http.StatusInternalServerError)
 			return
@@ -55,13 +55,14 @@ func handleForm(w http.ResponseWriter, r *http.Request) {
 			}
 
 			//Получение оригинального URL по короткому ключу и перенаправление
-			originalURL, err:=urls.HGet(shortKey)
+			originalURL, err:=tcpRequest("HGET", shortKey, "")
+			originalURL=strings.TrimPrefix(originalURL,shortKey+" ")
 			if err!=nil {
 				http.Error(w, "Короткая ссылка не найдена", http.StatusNotFound)
 				return
 		}
 
-		http.Redirect(w, r, originalURL, http.StatusMovedPermanently)
+		http.Redirect(w, r, originalURL, http.StatusMovedPermanently) //HTTP-перенаправление (если оригинальный URL успешно получен) клиента на этот оригинальный URL
 	}
 
 	//generateShortKey генерирует случайный короткий ключ
@@ -78,7 +79,7 @@ func handleForm(w http.ResponseWriter, r *http.Request) {
 
 //Получение своего IP-адреса (для того чтобы вставить в короткую ссылку)  ip-адрес:порт/short/(короткий ключ)
 //ИЛИ  GetMyIp возвращает IP-адрес локального сервера (для использования в укороченных URL)
-func GetMyIP() net.IP {
+func GetMyIP() net.IP { //использование UDP-соединение для определения локального адреса сервера
 	conn,_:=net.Dial("udp", "8.8.8.8:80")
 	defer conn.Close() //закрытие соединения 
 	localAddr:=conn.LocalAddr().(*net.UDPAddr)
@@ -102,7 +103,7 @@ func handleUserInput(w http.ResponseWriter, r *http.Request) {
 
 	//Генерация короткого ключа, вставка в хэш-таблицу и формирование укороченного URL для пользователя
 	shortKey := generateShortKey()
-	err := urls.Insert(shortKey, originalURL)
+	_,err:=tcpRequest("HPUSH", shortKey, originalURL) 
 	if err != nil {
 		http.Error(w, "Невозможно добавить укороченную ссылку в хэш-таблицу", http.StatusInternalServerError)
 		return
@@ -117,12 +118,31 @@ func handleUserInput(w http.ResponseWriter, r *http.Request) {
 }
 
 
+func tcpRequest(request, key, value string) (string, error) {
+	conn, _:=net.Dial("tcp", "localhost:6379")
+	defer conn.Close()
+	if request=="HPUSH"{
+		mainrequest:=fmt.Sprintf("%s %s %s", request, key, value)
+		 conn.Write([]byte(mainrequest))
+	}
+	if request=="HGET"{
+		mainrequest:=fmt.Sprintf("%s %s", request, key)
+		conn.Write([]byte(mainrequest))
+	}
+
+	tcpanswer:=make([]byte,512)
+	n,_:=conn.Read(tcpanswer)
+	return string(tcpanswer[:n]),nil
+}
+
+
+
 func main() {
 	http.HandleFunc("/", handleForm)
 	http.HandleFunc("/shorten", handleShorten)
-	http.HandleFunc("/short/", handleRedirect)
+	http.HandleFunc("/short/", handleRedirect) //перенаправление
 	http.HandleFunc("/user-input", handleUserInput) //Новый обработчик для ввода пользователя (для пользовательского ввода)                               
 
 	fmt.Println("URL Shortener is running on: 3333")
-	http.ListenAndServe("0.0.0.0:3333", nil)
+	http.ListenAndServe("0.0.0.0:3333", nil) //используется для запуска сервера и использование, и устанавливает обработчики для различных маршрутов
 }
